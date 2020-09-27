@@ -9,3 +9,5 @@
 /.psa*
 /.spago
 packageSet.json
+spagoFiles
+orderedContent.txt
