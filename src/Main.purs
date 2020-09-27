@@ -3,16 +3,16 @@ module Main where
 import Prelude
 
 import ChildProcess (execSync)
-import Control.Alt ((<|>))
-import Data.Array (catMaybes, foldl, length, nub, sort, sortBy)
+import Control.Monad.Rec.Class (Step(..), tailRec)
+import Data.Array (foldl, intercalate, length, nub, snoc, sort, sortBy, uncons)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
-import Data.HashMap (HashMap, insertWith, lookup, toArrayBy, update, upsert)
+import Data.HashMap (HashMap, lookup, toArrayBy)
 import Data.HashMap as HashMap
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
 import Data.String.CodeUnits (drop, take)
-import Data.Traversable (sequence, traverse)
+import Data.Traversable (for_)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
@@ -39,40 +39,68 @@ main = launchAff_ do
     Right { result } -> do
       let
         allDepsKnown = findAllTransitiveDeps result
-        mkOrderedContent =
+        mkSortedPackageArray =
           toArrayBy (\k v ->
-              { package: k, deps: sort v.dependencies, depCount: length v.dependencies})
-            >>> sortBy (\l r -> compare l.depCount r.depCount)
-            >>> flip foldl {init: true, str: ""} \acc r ->
-              let nextLine = show r.depCount <> "-" <> r.package <> ": " <> show r.deps
+              { package: k, meta: v { dependencies = sort v.dependencies }, depCount: length v.dependencies})
+            >>> sortBy (\l r ->
+                case compare l.depCount r.depCount of
+                  EQ -> compare l.package r.package
+                  x -> x
+            )
+
+        sortedPackageArray = mkSortedPackageArray allDepsKnown
+
+        mkOrderedContent =
+            flip foldl {init: true, str: ""} \acc r ->
+              let nextLine = show r.depCount <> "-" <> r.package <> ": " <> show r.meta.dependencies
               in { init: false
                  , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
                  }
 
-      writeTextFile UTF8 "./orderedContent.txt" $ (mkOrderedContent allDepsKnown).str
+        orderedContent = (mkOrderedContent sortedPackageArray).str
 
+      writeTextFile UTF8 "./orderedContent.txt" $ orderedContent
+      for_ sortedPackageArray \rec -> do
+        let
+          filePath = "./spagoFiles/" <> rec.package <> ".sh"
+          fileContent = mkSpagoDhall rec
+        writeTextFile UTF8 filePath fileContent
 
 findAllTransitiveDeps :: HashMap String PackageMeta -> HashMap String PackageMeta
-findAllTransitiveDeps packageMap = foldlWithIndex buildMap packageMap packageMap
+findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty packageMap
   where
   buildMap :: String -> HashMap String PackageMeta -> PackageMeta -> HashMap String PackageMeta
   buildMap packageName acc packageMeta =
     let
       deps = getDepsRecursively packageName
+      newMeta = packageMeta { dependencies = nub (packageMeta.dependencies <> deps)}
     in
-      update
-        (\meta -> Just $ meta { dependencies = nub (meta.dependencies <> deps)})
-        packageName
-        acc
+      acc <> (HashMap.singleton packageName newMeta)
 
   getDepsRecursively :: String -> Array String
   getDepsRecursively packageName =
     let
       direct = getDeps packageName
-      transitive = join $ traverse getDepsRecursively direct
+      transitive = tailRec go {acc: [], remaining: direct }
     in
       nub $ direct <> transitive
+
+  go :: _ -> Step _ _
+  go { acc, remaining } = case uncons remaining of
+    Nothing ->
+      Done acc
+    Just { head, tail } ->
+      Loop { acc: nub $ acc <> getDepsRecursively head, remaining: tail }
 
   getDeps :: String -> Array String
   getDeps packageName =
     fromMaybe [] $ map (_.dependencies) $ lookup packageName packageMap
+
+mkSpagoDhall :: forall r. { package :: String, meta :: PackageMeta | r } -> String
+mkSpagoDhall {package, meta } = do
+  let
+    firstPart = "node ../../purescript-psa --purs=./purs-v0.14-rc2 --strict "
+    allPackages = meta.dependencies `snoc` package
+    globs = intercalate " " $ allPackages <#> \p ->
+      "\".spago/" <> p <> "/*/src/**/*.purs"
+  firstPart <> globs
