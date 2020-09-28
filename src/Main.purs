@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import ChildProcess (execSync)
-import Control.Monad.Rec.Class (Step(..), tailRec)
+import Control.Monad.Rec.Class (Step(..), tailRec, tailRecM)
 import Data.Array (foldl, intercalate, length, nub, snoc, sort, sortBy, uncons)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
@@ -14,9 +14,10 @@ import Data.Monoid (power)
 import Data.String.CodeUnits (drop, take)
 import Data.Traversable (for_)
 import Effect (Effect)
-import Effect.Aff (launchAff_)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
+import Effect.Ref as Ref
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile, writeTextFile)
 import Parser (parsePackageSetJson)
@@ -70,27 +71,37 @@ findAllTransitiveDeps :: HashMap String PackageMeta -> HashMap String PackageMet
 findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty packageMap
   where
   buildMap :: String -> HashMap String PackageMeta -> PackageMeta -> HashMap String PackageMeta
-  buildMap packageName acc packageMeta =
-    let
-      deps = getDepsRecursively packageName
-      newMeta = packageMeta { dependencies = nub (packageMeta.dependencies <> deps)}
-    in
-      acc <> (HashMap.singleton packageName newMeta)
+  buildMap packageName mapSoFar packageMeta = do
+    case lookup packageName mapSoFar of
+      Just deps -> mapSoFar
+      Nothing ->
+        let { deps, updatedMap } = getDepsRecursively packageName packageMeta mapSoFar
+        in updatedMap
 
-  getDepsRecursively :: String -> Array String
-  getDepsRecursively packageName =
+  getDepsRecursively :: String -> PackageMeta -> HashMap String PackageMeta
+    -> { deps :: Array String, updatedMap :: HashMap String PackageMeta }
+  getDepsRecursively packageName packageMeta mapSoFar = do
     let
       direct = getDeps packageName
-      transitive = tailRec go {acc: [], remaining: direct }
-    in
-      nub $ direct <> transitive
+    tailRec go { packageName, packageMeta, mapSoFar, allDeps: direct, remaining: direct }
 
   go :: _ -> Step _ _
-  go { acc, remaining } = case uncons remaining of
+  go state@{ packageName, packageMeta, mapSoFar, allDeps, remaining } = case uncons remaining of
     Nothing ->
-      Done acc
-    Just { head, tail } ->
-      Loop { acc: nub $ acc <> getDepsRecursively head, remaining: tail }
+      let
+        allDepsNubbed = nub allDeps
+        newMeta = packageMeta { dependencies = allDepsNubbed }
+      in Done { deps: allDepsNubbed, updatedMap: mapSoFar <> (HashMap.singleton packageName newMeta) }
+    Just { head: package, tail } -> do
+      case lookup packageName mapSoFar of
+        Just newMeta -> Loop $ state { allDeps = nub $ state.allDeps <> newMeta.dependencies, remaining = tail }
+        Nothing ->  case lookup package packageMap of
+          Nothing ->
+            -- Note: this should never happen, but can't show that
+            Loop $ state { remaining = tail }
+          Just oldMeta ->
+            let { deps, updatedMap } = getDepsRecursively package oldMeta mapSoFar
+            in Loop $ state { allDeps = nub $ allDeps <> deps, mapSoFar = updatedMap, remaining = tail }
 
   getDeps :: String -> Array String
   getDeps packageName =
