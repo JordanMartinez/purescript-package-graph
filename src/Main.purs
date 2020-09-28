@@ -11,6 +11,7 @@ import Data.HashMap (HashMap, lookup, toArrayBy)
 import Data.HashMap as HashMap
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
+import Data.String (joinWith)
 import Data.String.CodeUnits (drop, take)
 import Data.Traversable (for_)
 import Effect (Effect)
@@ -63,7 +64,7 @@ main = launchAff_ do
       writeTextFile UTF8 "./orderedContent.txt" $ orderedContent
       for_ sortedPackageArray \rec -> do
         let
-          filePath = "./spagoFiles/" <> rec.package <> ".sh"
+          filePath = "./spagoFiles/" <> rec.package <> ".dhall"
           fileContent = mkSpagoDhall rec
         writeTextFile UTF8 filePath fileContent
 
@@ -108,10 +109,10 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
     fromMaybe [] $ map (_.dependencies) $ lookup packageName packageMap
 
 mkSpagoDhall :: forall r. { package :: String, meta :: PackageMeta | r } -> String
-mkSpagoDhall {package, meta } = do
-  let
-    firstPart = "node ../../purescript-psa --purs=./purs-v0.14-rc2 --strict "
-    allPackages = meta.dependencies `snoc` package
-    globs = intercalate " " $ allPackages <#> \p ->
-      "\".spago/" <> p <> "/*/src/**/*.purs"
-  firstPart <> globs
+mkSpagoDhall {package, meta } = joinWith "\n"
+  [ "{ name = \"my-project\""
+  , ", dependencies = " <> show (meta.dependencies `snoc` package)
+  , ", packages = ./packages.dhall"
+  , ", sources = [ \"src/**/*.purs\" ]"
+  , "}"
+  ]
