@@ -96,7 +96,7 @@ parseGenLibDeps :: OA.Parser Command
 parseGenLibDeps = map GenLibraryDeps ado
   libraryDepFile <- strOption $ fold
     [ long "output"
-    , short 'l'
+    , short 'o'
     , metavar "FILE"
     , help "Indicates the file that will store the outputted content."
     , value "./ordered-content.txt"
@@ -109,7 +109,7 @@ parseGenSpagoFiles = map GenSpagoFiles ado
   directory <- strOption $ fold
     [ long "dir"
     , metavar "DIRECTORY"
-    , short 's'
+    , short 'd'
     , help "Indicates the directory which will store the outputted \
            \`<packageName>.dhall` files."
     , value "./spagoFiles"
