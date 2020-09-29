@@ -83,9 +83,9 @@ runApp env = do
         list <- Ref.read ref
         unless (List.null list) do
           log $ "The following packages did not have a \
-                           \`spago.dhall` file created because they \
-                           \already exist. To overwrite them, use the \
-                           \`--force` flag."
+                \`spago.dhall` file created because they \
+                \already exist. To overwrite them, use the \
+                \`--force` flag."
           let content = intercalate ", " list
           log content
 
