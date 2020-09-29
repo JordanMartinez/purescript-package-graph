@@ -21,7 +21,7 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Ref as Ref
 import Node.Encoding (Encoding(..))
-import Node.FS.Aff (exists, readTextFile, writeTextFile)
+import Node.FS.Aff (exists, mkdirRecursive, readTextFile, writeTextFile)
 import Parser (parsePackageSetJson)
 import Partial.Unsafe (unsafeCrashWith)
 import Text.Parsing.StringParser (unParser)
@@ -61,6 +61,8 @@ runApp env = do
 
     runSpagoFiles :: SpagoFilesOptions -> HashMap String PackageMeta -> Aff Unit
     runSpagoFiles { directory, whitelist } allDepsKnown = do
+      dirExists <- exists directory
+      unless dirExists $ mkdirRecursive directory
       let
         onlyDesiredPackages = case whitelist of
           Nothing -> allDepsKnown
