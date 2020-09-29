@@ -22,6 +22,7 @@ import Effect.Ref as Ref
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile, writeTextFile)
 import Parser (parsePackageSetJson)
+import Partial.Unsafe (unsafeCrashWith)
 import Text.Parsing.StringParser (unParser)
 import Types (PackageMeta)
 
@@ -99,8 +100,9 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
         Just newMeta -> Loop $ state { allDeps = nub $ state.allDeps <> newMeta.dependencies, remaining = tail }
         Nothing ->  case lookup package packageMap of
           Nothing ->
-            -- Note: this should never happen, but can't show that
-            Loop $ state { remaining = tail }
+            unsafeCrashWith $
+              "The impossible happened. `packageMap` does not contain \
+              \the package '" <> packageName <> "'."
           Just oldMeta ->
             let { deps, updatedMap } = getDepsRecursively package oldMeta mapSoFar
             in Loop $ state { allDeps = nub $ allDeps <> deps, mapSoFar = updatedMap, remaining = tail }
