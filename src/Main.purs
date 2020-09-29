@@ -43,25 +43,8 @@ main = launchAff_ do
     Right { result } -> do
       let
         allDepsKnown = findAllTransitiveDeps result
-        mkSortedPackageArray =
-          toArrayBy (\k v ->
-              { package: k, meta: v { dependencies = sort v.dependencies }, depCount: length v.dependencies})
-            >>> sortBy (\l r ->
-                case compare l.depCount r.depCount of
-                  EQ -> compare l.package r.package
-                  x -> x
-            )
-
         sortedPackageArray = mkSortedPackageArray allDepsKnown
-
-        mkOrderedContent =
-            flip foldl {init: true, str: ""} \acc r ->
-              let nextLine = show r.depCount <> "-" <> r.package <> ": " <> show r.meta.dependencies
-              in { init: false
-                 , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
-                 }
-
-        orderedContent = (mkOrderedContent sortedPackageArray).str
+        orderedContent = mkOrderedContent sortedPackageArray
 
       writeTextFile UTF8 "./orderedContent.txt" $ orderedContent
       for_ sortedPackageArray \rec -> do
@@ -110,6 +93,26 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
   getDeps :: String -> Array String
   getDeps packageName =
     fromMaybe [] $ map (_.dependencies) $ lookup packageName packageMap
+
+mkSortedPackageArray :: HashMap String PackageMeta -> Array { package :: String, meta :: PackageMeta, depCount :: Int }
+mkSortedPackageArray =
+  toArrayBy (\k v ->
+      { package: k, meta: v { dependencies = sort v.dependencies }, depCount: length v.dependencies})
+    >>> sortBy (\l r ->
+        case compare l.depCount r.depCount of
+          EQ -> compare l.package r.package
+          x -> x
+    )
+
+mkOrderedContent :: Array { package :: String, meta :: PackageMeta, depCount :: Int } -> String
+mkOrderedContent arr = foldResult.str
+  where
+    foldResult = foldl buildLine {init: true, str: ""} arr
+    buildLine acc r =
+      let nextLine = show r.depCount <> "-" <> r.package <> ": " <> show r.meta.dependencies
+      in { init: false
+         , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
+         }
 
 mkSpagoDhall :: forall r. { package :: String, meta :: PackageMeta | r } -> String
 mkSpagoDhall {package, meta } = joinWith "\n"
