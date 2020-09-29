@@ -3,8 +3,7 @@ module Main where
 import Prelude
 
 import CLI (Command(..), parseCliArgs)
-import ChildProcess (execSync)
-import Control.Monad.Rec.Class (Step(..), tailRec, tailRecM)
+import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array (elemIndex, foldl, intercalate, length, nub, snoc, sort, sortBy, uncons)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
@@ -12,13 +11,13 @@ import Data.HashMap (HashMap, filterKeys, lookup, toArrayBy)
 import Data.HashMap as HashMap
 import Data.List (List(..))
 import Data.List as List
-import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid (power)
 import Data.String (joinWith)
 import Data.String.CodeUnits (drop, take)
 import Data.Traversable (for_)
 import Effect (Effect)
-import Effect.Aff (Aff, launchAff_)
+import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Exception (throw)
