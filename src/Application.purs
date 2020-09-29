@@ -19,7 +19,6 @@ import Data.Traversable (for_)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Effect.Exception (throw)
 import Effect.Ref as Ref
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (exists, readTextFile, writeTextFile)
@@ -51,10 +50,11 @@ runApp env = do
     runGenLibDeps { libraryDepFile } allDepsKnown = do
       fileExists <- exists libraryDepFile
       if fileExists && not env.force
-        then do
-          liftEffect $ throw $
-              "Output file '" <> libraryDepFile <> "'already exists. \
+        then liftEffect do
+          log $
+              "Error: Output file '" <> libraryDepFile <> "'already exists. \
               \To overwrite this file, use the `--force` flag."
+          log "Exiting program."
         else do
           let orderedContent = mkOrderedContent $ mkSortedPackageArray allDepsKnown
           writeTextFile UTF8 libraryDepFile orderedContent
