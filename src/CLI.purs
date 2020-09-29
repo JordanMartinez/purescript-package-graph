@@ -10,7 +10,7 @@ import Data.String (Pattern(..), split)
 import Data.String as String
 import Effect (Effect)
 import ExitCodes (ExitCode(..))
-import Options.Applicative (execParser, failureCode, help, helper, info, long, metavar, option, progDesc, short, showDefault, strOption, switch, value)
+import Options.Applicative (execParser, failureCode, footer, help, helper, info, long, metavar, option, progDesc, short, showDefault, strOption, switch, value)
 import Options.Applicative as OA
 import Options.Applicative.Types (ReadM, readerAsk)
 
@@ -45,6 +45,8 @@ parseCliArgs = do
           \1. `genLibDeps` - " <> genLibsDescription <> "\n\
           \2. `genSpagoFiles` - " <> genSpagoFilesDescription
     , failureCode Error
+    , footer "Example usage: package-query --input ./packageSet.json --force \
+             \genSpagoFiles --dir ./spagoFiles --whitelist foldable-traversable"
     ]
 
 genLibsDescription :: String
