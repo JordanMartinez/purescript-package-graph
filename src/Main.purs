@@ -35,9 +35,10 @@ main = launchAff_ do
   case unParser parsePackageSetJson {str: packageJson, pos:0} of
     Left e ->
       liftEffect do
+        let width = 10
         log $ show e.error <> " @ " <> show e.pos
-        log $ take 20 $ drop (e.pos - 10) packageJson
-        log $ power " " 9 <> "^"
+        log $ take (width * 2) $ drop (e.pos - width) packageJson
+        log $ power " " (width - 1) <> "^"
     Right { result } -> do
       let
         allDepsKnown = findAllTransitiveDeps result
