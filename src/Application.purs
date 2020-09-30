@@ -147,7 +147,7 @@ mkOrderedContent arr = foldResult.str
   where
   foldResult = foldl buildLine {init: true, str: ""} arr
   buildLine acc r =
-    let nextLine = show r.depCount <> "-" <> r.package <> ": " <> show r.meta.dependencies
+    let nextLine = show r.depCount <> "-" <> r.package <> "-" <> r.meta.repo <> ": " <> show r.meta.dependencies
     in { init: false
        , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
        }
