@@ -11,6 +11,7 @@ You can edit this file as you like.
   , "optparse"
   , "psci-support"
   , "string-parsers"
+  , "stringutils"
   , "unordered-collections"
   ]
 , packages = ./packages.dhall

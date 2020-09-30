@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid (power)
 import Data.String (joinWith)
 import Data.String.CodeUnits (drop, take)
+import Data.String.Utils (padEnd)
 import Data.Traversable (for_)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -147,7 +148,11 @@ mkOrderedContent arr = foldResult.str
   where
   foldResult = foldl buildLine {init: true, str: ""} arr
   buildLine acc r =
-    let nextLine = show r.depCount <> "-" <> r.package <> "-" <> r.meta.repo <> ": " <> show r.meta.dependencies
+    let
+      depCount = padEnd 2 $ show r.depCount
+      package = padEnd 30 r.package
+      repo = padEnd 90 r.meta.repo
+      nextLine = depCount <> " " <> package <> " " <> repo <> " " <> show r.meta.dependencies
     in { init: false
        , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
        }
