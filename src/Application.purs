@@ -162,6 +162,6 @@ mkSpagoDhall {package, meta } = joinWith "\n"
   [ "{ name = \"my-project\""
   , ", dependencies = " <> show (meta.dependencies `snoc` package)
   , ", packages = ./packages.dhall"
-  , ", sources = [ \"src/**/*.purs\" ]"
+  , ", sources = [] : List Text"
   , "}"
   ]
