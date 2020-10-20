@@ -26,6 +26,7 @@ data Command
 
 type LibraryDepsOptions =
   { libraryDepFile :: String
+  , finishedDepsFile :: String
   }
 
 type SpagoFilesOptions =
@@ -102,7 +103,16 @@ parseGenLibDeps = map GenLibraryDeps ado
     , value "./ordered-content.txt"
     , showDefault
     ]
-  in { libraryDepFile }
+  finishedDepsFile <- strOption $ fold
+    [ long "finished-dependencies-file"
+    , short 'd'
+    , metavar "FILE"
+    , help "Indicates the file that lists packages that have already been \
+           \updated on a separate line."
+    , value "./finished-dependencies.txt"
+    , showDefault
+    ]
+  in { libraryDepFile, finishedDepsFile }
 
 parseGenSpagoFiles :: OA.Parser Command
 parseGenSpagoFiles = map GenSpagoFiles ado

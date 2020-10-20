@@ -4,7 +4,7 @@ import Prelude
 
 import CLI (Command(..), Env, LibraryDepsOptions, SpagoFilesOptions)
 import Control.Monad.Rec.Class (Step(..), tailRec)
-import Data.Array (elemIndex, foldl, intercalate, length, nub, snoc, sort, sortBy, uncons)
+import Data.Array (difference, elemIndex, foldl, intercalate, length, nub, snoc, sort, sortBy, uncons)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.HashMap (HashMap, filterKeys, lookup, toArrayBy)
@@ -13,7 +13,7 @@ import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid (power)
-import Data.String (joinWith)
+import Data.String (Pattern(..), joinWith, split, trim)
 import Data.String.CodeUnits (drop, take)
 import Data.String.Utils (padEnd)
 import Data.Traversable (for_)
@@ -39,16 +39,15 @@ runApp env = do
         log $ take (width * 2) $ drop (e.pos - width) packageJson
         log $ power " " (width - 1) <> "^"
     Right { result } -> do
-      let allDepsKnown = findAllTransitiveDeps result
       case env.command of
         GenLibraryDeps options -> do
-          runGenLibDeps options allDepsKnown
+          runGenLibDeps options result
         GenSpagoFiles options -> do
-          runSpagoFiles options allDepsKnown
+          runSpagoFiles options $ findAllTransitiveDeps result
 
   where
     runGenLibDeps :: LibraryDepsOptions -> HashMap String PackageMeta -> Aff Unit
-    runGenLibDeps { libraryDepFile } allDepsKnown = do
+    runGenLibDeps { libraryDepFile, finishedDepsFile } result = do
       fileExists <- exists libraryDepFile
       if fileExists && not env.force
         then liftEffect do
@@ -57,6 +56,10 @@ runApp env = do
               \To overwrite this file, use the `--force` flag."
           log "Exiting program."
         else do
+          finishedDeps <- readTextFile UTF8 finishedDepsFile
+          let depsToRemove = map trim $ split (Pattern "\n") finishedDeps
+          let removedDeps = removeFinishedDeps depsToRemove result
+          let allDepsKnown = findAllTransitiveDeps removedDeps
           let orderedContent = mkOrderedContent $ mkSortedPackageArray allDepsKnown
           writeTextFile UTF8 libraryDepFile orderedContent
 
@@ -132,6 +135,12 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
   getDeps :: String -> Array String
   getDeps packageName =
     fromMaybe [] $ map (_.dependencies) $ lookup packageName packageMap
+
+removeFinishedDeps :: Array String -> HashMap String PackageMeta -> HashMap String PackageMeta
+removeFinishedDeps depsToRemove packageMap = do
+  let removedKeys = foldl (flip HashMap.delete) packageMap depsToRemove
+  removedKeys <#> \packageMeta ->
+    packageMeta { dependencies = difference packageMeta.dependencies depsToRemove }
 
 mkSortedPackageArray :: HashMap String PackageMeta -> Array { package :: String, meta :: PackageMeta, depCount :: Int }
 mkSortedPackageArray =
