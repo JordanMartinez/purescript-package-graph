@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Monoid (power)
 import Data.String (Pattern(..), joinWith, split, trim)
 import Data.String.CodeUnits (drop, take)
+import Data.String.CodeUnits as SCU
 import Data.String.Utils (padEnd)
 import Data.Traversable (for_)
 import Effect.Aff (Aff)
@@ -155,12 +156,18 @@ mkSortedPackageArray =
 mkOrderedContent :: Array { package :: String, meta :: PackageMeta, depCount :: Int } -> String
 mkOrderedContent arr = foldResult.str
   where
+  maxLength = foldl maxPartLength { dep: 0, package: 0, repo: 0 } arr
+  maxPartLength acc r =
+    { dep:     max acc.dep     $ SCU.length $ show r.depCount
+    , package: max acc.package $ SCU.length r.package
+    , repo:    max acc.repo    $ SCU.length r.meta.repo
+    }
   foldResult = foldl buildLine {init: true, str: ""} arr
   buildLine acc r =
     let
-      depCount = padEnd 2 $ show r.depCount
-      package = padEnd 30 r.package
-      repo = padEnd 90 r.meta.repo
+      depCount = padEnd maxLength.dep $ show r.depCount
+      package = padEnd maxLength.package r.package
+      repo = padEnd maxLength.repo r.meta.repo
       nextLine = depCount <> " " <> package <> " " <> repo <> " " <> show r.meta.dependencies
     in { init: false
        , str: if acc.init then nextLine else acc.str <> "\n" <> nextLine
