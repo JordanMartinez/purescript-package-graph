@@ -59,7 +59,7 @@ parser = ado
     [ genLibsCmd
     -- , genSpagoFilesCmd
     ]
-  genLibsCmd = Arg.command [ "generate-operators" ] desc do
+  genLibsCmd = Arg.command [ "lib-deps" ] desc do
     GenLibraryDeps
       <$> cmdArgs
       <* Arg.flagHelp
