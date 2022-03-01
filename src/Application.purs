@@ -11,10 +11,10 @@ import Data.Array (difference, elemIndex, foldl, length, nub, snoc, sort, sortBy
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
-import Data.HashMap (HashMap, filterKeys, lookup, toArrayBy)
-import Data.HashMap as HashMap
 import Data.List (List(..), intercalate)
 import Data.List as List
+import Data.Map (Map, filterKeys, lookup)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (Pattern(..), joinWith, split, trim)
 import Data.String.CodeUnits as SCU
@@ -41,7 +41,7 @@ runApp env = do
       keyVals <- forWithIndex obj \key val -> do
         packageMeta <- decodeJson val
         pure $ Tuple key packageMeta
-      pure $ HashMap.fromFoldable keyVals
+      pure $ Map.fromFoldable keyVals
   case decode =<< jsonParser packageJson of
     Left e -> liftEffect do
       log $ "Decoding error while parsing JSON file"
@@ -54,7 +54,7 @@ runApp env = do
           runSpagoFiles options $ findAllTransitiveDeps result
 
   where
-  runGenLibDeps :: LibraryDepsOptions -> HashMap String PackageMeta -> Aff Unit
+  runGenLibDeps :: LibraryDepsOptions -> Map String PackageMeta -> Aff Unit
   runGenLibDeps { libraryDepFile, finishedDepsFile } result = do
     fileExists <- exists libraryDepFile
     if fileExists && not env.force then liftEffect do
@@ -71,7 +71,7 @@ runApp env = do
       let orderedContent = mkOrderedContent $ mkSortedPackageArray allDepsKnown
       writeTextFile UTF8 libraryDepFile orderedContent
 
-  runSpagoFiles :: SpagoFilesOptions -> HashMap String PackageMeta -> Aff Unit
+  runSpagoFiles :: SpagoFilesOptions -> Map String PackageMeta -> Aff Unit
   runSpagoFiles { directory, whitelist } allDepsKnown = do
     dirExists <- exists directory
     unless dirExists $ mkdirRecursive directory
@@ -105,10 +105,10 @@ runApp env = do
         let content = intercalate ", " list
         log content
 
-findAllTransitiveDeps :: HashMap String PackageMeta -> HashMap String PackageMeta
-findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty packageMap
+findAllTransitiveDeps :: Map String PackageMeta -> Map String PackageMeta
+findAllTransitiveDeps packageMap = foldlWithIndex buildMap Map.empty packageMap
   where
-  buildMap :: String -> HashMap String PackageMeta -> PackageMeta -> HashMap String PackageMeta
+  buildMap :: String -> Map String PackageMeta -> PackageMeta -> Map String PackageMeta
   buildMap packageName mapSoFar packageMeta = do
     case lookup packageName mapSoFar of
       Just deps -> mapSoFar
@@ -121,8 +121,8 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
   getDepsRecursively
     :: String
     -> PackageMeta
-    -> HashMap String PackageMeta
-    -> { deps :: Array String, updatedMap :: HashMap String PackageMeta }
+    -> Map String PackageMeta
+    -> { deps :: Array String, updatedMap :: Map String PackageMeta }
   getDepsRecursively packageName packageMeta mapSoFar = do
     let
       direct = getDeps packageName
@@ -135,7 +135,7 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
         allDepsNubbed = nub allDeps
         newMeta = packageMeta { dependencies = allDepsNubbed }
       in
-        Done { deps: allDepsNubbed, updatedMap: HashMap.unionWith (<>) mapSoFar (HashMap.singleton packageName newMeta) }
+        Done { deps: allDepsNubbed, updatedMap: Map.unionWith (<>) mapSoFar (Map.singleton packageName newMeta) }
     Just { head: package, tail } -> do
       case lookup packageName mapSoFar of
         Just newMeta -> Loop $ state { allDeps = nub $ state.allDeps <> newMeta.dependencies, remaining = tail }
@@ -154,18 +154,19 @@ findAllTransitiveDeps packageMap = foldlWithIndex buildMap HashMap.empty package
   getDeps packageName =
     fromMaybe [] $ map (_.dependencies) $ lookup packageName packageMap
 
-removeFinishedDeps :: Array String -> HashMap String PackageMeta -> HashMap String PackageMeta
+removeFinishedDeps :: Array String -> Map String PackageMeta -> Map String PackageMeta
 removeFinishedDeps depsToRemove packageMap = do
-  let removedKeys = foldl (flip HashMap.delete) packageMap depsToRemove
+  let removedKeys = foldl (flip Map.delete) packageMap depsToRemove
   removedKeys <#> \packageMeta ->
     packageMeta { dependencies = difference packageMeta.dependencies depsToRemove }
 
-mkSortedPackageArray :: HashMap String PackageMeta -> Array { package :: String, meta :: PackageMeta, depCount :: Int }
+mkSortedPackageArray :: Map String PackageMeta -> Array { package :: String, meta :: PackageMeta, depCount :: Int }
 mkSortedPackageArray =
-  toArrayBy
-    ( \k v ->
-        { package: k, meta: v { dependencies = sort v.dependencies }, depCount: length v.dependencies }
-    )
+  Map.toUnfoldable
+    >>> map
+      ( \(Tuple k v) ->
+          { package: k, meta: v { dependencies = sort v.dependencies }, depCount: length v.dependencies }
+      )
     >>> sortBy
       ( \l r ->
           case compare l.depCount r.depCount of

@@ -16,6 +16,7 @@
   , "node-buffer"
   , "node-fs-aff"
   , "node-process"
+  , "ordered-collections"
   , "partial"
   , "prelude"
   , "refs"
