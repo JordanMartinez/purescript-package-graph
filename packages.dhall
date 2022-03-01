@@ -8,3 +8,22 @@ in  upstream
   with node-fs-aff.repo
        = "https://github.com/JordanMartinez/purescript-node-fs-aff"
   with node-fs-aff.version = "addCopyFile"
+  with argparse-basic =
+    { dependencies =
+      [ "arrays"
+      , "console"
+      , "debug"
+      , "effect"
+      , "either"
+      , "foldable-traversable"
+      , "free"
+      , "lists"
+      , "maybe"
+      , "node-process"
+      , "record"
+      , "strings"
+      , "transformers"
+      ]
+    , repo = "https://github.com/natefaubion/purescript-argparse-basic.git"
+    , version = "v1.0.0"
+    }
